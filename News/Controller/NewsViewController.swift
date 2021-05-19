@@ -13,6 +13,8 @@ class NewsViewController: UIViewController {
     private var viewModels = [NewsCellModel]()
     private var articles = [Article]()
     
+    private let searchVC = UISearchController(searchResultsController: nil)
+    
     let tableView: UITableView = {
         let view = UITableView()
         view.register(NewsTableViewCell.self,
@@ -31,7 +33,13 @@ class NewsViewController: UIViewController {
         tableView.delegate = self
         tableView.dataSource = self
         
+        createSearchBar()
         fetchTopStories()
+    }
+    
+    private func createSearchBar() {
+        navigationItem.searchController = searchVC
+        searchVC.searchBar.delegate = self
     }
     
     private func fetchTopStories() {
@@ -94,5 +102,31 @@ extension NewsViewController: UITableViewDelegate, UITableViewDataSource {
     
     func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
         return 150
+    }
+}
+
+extension NewsViewController: UISearchBarDelegate {
+    func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
+        guard let text = searchBar.text, !text.isEmpty else { return }
+        
+        APICaller.shared.search(with: text) { [weak self] result in
+            print("NEWS result: \(result)")
+            
+            switch result {
+            case .success(let articles):
+                self?.articles = articles
+                self?.viewModels = articles.compactMap {
+                    NewsCellModel(title: $0.title,
+                                  subtitle: $0.description ?? "No Description",
+                                  imageURL: URL(string: $0.urlToImage ?? ""))
+                }
+                
+                DispatchQueue.main.async {
+                    self?.tableView.reloadData()
+                }
+            case .failure(let error):
+                print(error)
+            }
+        }
     }
 }
